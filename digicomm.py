@@ -2,7 +2,7 @@ import numpy as np
 import scipy as sp
 from matplotlib import pyplot as plt
 
-r_g = 2 # radius gamma used for 16-APSK
+r_g = 2.75 # radius gamma used for 16-APSK
 
 constellations = {
     'bpsk' : np.array([-1,1], 'complex128'),
@@ -109,6 +109,21 @@ def addPhaseOffset(iqs, phase=None):
     if phase == None:
         phase = 2*np.pi*np.random.rand()
     return iqs * np.exp(1j*phase)
+
+def phaseAmbiguity(rx,uw):
+    '''
+    Returns angle between received samples and the provided unique word.
+    '''
+    return np.angle(np.mean(rx*np.conj(uw)))
+
+def phaseAmbiguityResolution(rx, rxuw, uw):
+    '''
+    Returns the received data with the phase ambiguity removed.
+    rxuw are the received symbols corresponding to the unique word
+    uw is the unique word itself
+    '''
+    a = phaseAmbiguity(rxuw,uw)
+    return addPhaseOffset(rx, phase=-a)
 
 def makeDecision(iq, constellation):
     '''
