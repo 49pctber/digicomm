@@ -4,6 +4,7 @@ from matplotlib import pyplot as plt
 
 r_g = 2.75 # radius gamma used for 16-APSK
 
+
 constellations = {
     'bpsk' : np.array([-1,1], 'complex128'),
     '4pam' : np.array([-3, -1, 3, 1], 'complex128'),
@@ -42,6 +43,7 @@ constellations = {
     ]),
 } # not necessarily unit energy!
 
+
 def getConstellation(type='bpsk', gamma=2.5):
     '''
     Returns a constellation with average unit energy.
@@ -52,6 +54,7 @@ def getConstellation(type='bpsk', gamma=2.5):
     # Normalize energy and return constellation
     Eavg = np.mean(c * np.conj(c))
     return c / np.sqrt(Eavg)
+
 
 def bitsToSymbols(bits, M):
     '''
@@ -69,6 +72,7 @@ def bitsToSymbols(bits, M):
 
     return symbols
 
+
 def symbolsToBits(syms, M):
     '''
     Takes a series of symbols and converts them to their corresponding bits.
@@ -83,6 +87,7 @@ def symbolsToBits(syms, M):
             bits[i*n+j] = s[j]
     return bits
 
+
 def addNoise(iqs, SNR=10, Eb=1):
     '''
     adds noise for a specified SNR
@@ -95,11 +100,13 @@ def addNoise(iqs, SNR=10, Eb=1):
     ni = np.random.normal(scale=np.sqrt(var), size=(len(iqs),))
     return iqs + (nr + 1j*ni)
 
+
 def addFrequencyOffset(iqs, nuT=0.0):
     '''
     Adds a frequency nuT in terms of cycles/sample.
     '''
     return iqs * np.exp(1j*2.0*np.pi*np.arange(0,len(iqs))*nuT)
+
 
 def addPhaseOffset(iqs, phase=None):
     '''
@@ -110,11 +117,13 @@ def addPhaseOffset(iqs, phase=None):
         phase = 2*np.pi*np.random.rand()
     return iqs * np.exp(1j*phase)
 
+
 def phaseAmbiguity(rx,uw):
     '''
     Returns angle between received samples and the provided unique word.
     '''
     return np.angle(np.mean(rx*np.conj(uw)))
+
 
 def phaseAmbiguityResolution(rx, rxuw, uw):
     '''
@@ -125,11 +134,13 @@ def phaseAmbiguityResolution(rx, rxuw, uw):
     a = phaseAmbiguity(rxuw,uw)
     return addPhaseOffset(rx, phase=-a)
 
+
 def makeDecision(iq, constellation):
     '''
     returns the index of nearest constellation point
     '''
     return np.argmin(abs(constellation - iq))
+
 
 def makeDecisions(iqs, constellation):
     '''
@@ -139,6 +150,7 @@ def makeDecisions(iqs, constellation):
     for i in range(0,len(iqs)):
         idxs[i] = makeDecision(iqs[i], constellation)
     return idxs
+
 
 def freqOffsetEstimation16Apsk(rx, mode='gauss'):
     '''
@@ -183,6 +195,7 @@ def freqOffsetEstimation16Apsk(rx, mode='gauss'):
     else:
         raise Exception('Invalid mode.')
 
+
 def freqOffsetEstimationQpsk(rx, mode='interp_2'):
     '''
     Various methods for estimating a frequency offset when using a QPSK constellation
@@ -226,6 +239,36 @@ def freqOffsetEstimationQpsk(rx, mode='interp_2'):
         return vhat2
     else:
         raise Exception('Invalid mode.')
+
+
+def createDerivativeFilter(N=51,Tsamp=1):
+    '''
+    Calculates the coefficients for a derivative filter.
+    N must be odd
+    '''
+    if (N+1)%4 != 0:
+        raise Exception("createDerivativeFilter: N must be of form 4*n-1")
+    ndmin = -(N-1)/2
+    ndmax = (N-1)/2 
+    nd = np.arange(ndmin, ndmax+1)
+    d = 1 / Tsamp * ((-1)**nd) / nd / 2
+    d[np.isinf(d)] = 0
+    return d
+
+
+def derivativeFilter(x, N=51,Tsamp=1):
+    '''
+    Calculates the derivative of a discrete-time signal x with sample time Tsamp using a filter of length N.
+    Because convolution results in values that are not correct near the edges, I decided to zero out those values as they can be quite large. So don't be surpised by the zeros at the beginning and end of the array.
+    '''
+    d = createDerivativeFilter(N=N,Tsamp=Tsamp)
+    pad = int((N-1)/2) # this is the number of samples at the beginning/end of the signal that aren't quite correct due to blurring from convolution
+    xd = (np.convolve(x,d))[pad:-pad]
+    xd[0:pad] = 0
+    xd[-pad:-1] = 0
+    xd[-1] = 0
+    return xd
+
 
 if __name__ == "__main__":
     syms = np.array([0,1,2,3,15])
