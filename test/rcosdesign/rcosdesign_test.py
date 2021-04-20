@@ -1,8 +1,3 @@
-import sys
-
-for path in sys.path:
-    print(path)
-
 import numpy as np
 import matplotlib.pyplot as plt
 import digicomm
