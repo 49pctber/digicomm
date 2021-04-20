@@ -122,7 +122,7 @@ def phaseAmbiguity(rx,uw):
     '''
     Returns angle between received samples and the provided unique word.
     '''
-    return np.angle(np.mean(rx*np.conj(uw)))
+    return np.angle(np.sum(rx*np.conj(uw)))
 
 
 def phaseAmbiguityResolution(rx, rxuw, uw):
@@ -256,7 +256,7 @@ def createDerivativeFilter(N=51,Tsamp=1):
     return d
 
 
-def derivativeFilter(x, N=51,Tsamp=1):
+def derivativeFilter(x, N=51,Tsamp=1,zero_edge=False):
     '''
     Calculates the derivative of a discrete-time signal x with sample time Tsamp using a filter of length N.
     Because convolution results in values that are not correct near the edges, I decided to zero out those values as they can be quite large. So don't be surpised by the zeros at the beginning and end of the array.
@@ -264,10 +264,79 @@ def derivativeFilter(x, N=51,Tsamp=1):
     d = createDerivativeFilter(N=N,Tsamp=Tsamp)
     pad = int((N-1)/2) # this is the number of samples at the beginning/end of the signal that aren't quite correct due to blurring from convolution
     xd = (np.convolve(x,d))[pad:-pad]
-    xd[0:pad] = 0
-    xd[-pad:-1] = 0
-    xd[-1] = 0
+    if zero_edge:
+        xd[0:pad] = 0
+        xd[-pad:-1] = 0
+        xd[-1] = 0
     return xd
+
+
+def rcosdesign(alpha, span, Fs, Ts=1, shape='sqrt'):
+    """
+    Heavily modified from https://github.com/veeresht/CommPy/blob/master/commpy/filters.py
+    Modified:
+        -to return pulse with unit energy.
+        -match MATLAB function call
+        -return pulse shape of length span*Fs+1
+
+    Generates a root raised cosine (RRC) filter (FIR) impulse response
+    Parameters
+    ----------
+    alpha : float
+        Roll off factor (Valid values are [0, 1]).
+    span : int
+        Number of symbols to span
+    Fs : float
+        Sampling Rate in Hz.
+    Ts : float
+        Symbol period in seconds.
+    Returns
+    ---------
+    h : 1-D ndarray of floats
+        Impulse response of the root raised cosine filter.
+    time_idx : 1-D ndarray of floats
+        Array containing the time indices, in seconds, for
+        the impulse response.
+    """
+
+    N = span * Fs
+    T_delta = 1/float(Fs)
+    time_idx = ((np.arange(N+1)-N/2))*T_delta
+    sample_num = np.arange(N)
+    h = np.zeros(N, dtype=float)
+
+    if shape == 'sqrt':
+        for x in sample_num:
+            t = (x-N/2)*T_delta
+            if t == 0.0:
+                h[x] = 1.0 - alpha + (4*alpha/np.pi)
+            elif alpha != 0 and t == Ts/(4*alpha):
+                h[x] = (alpha/np.sqrt(2))*(((1+2/np.pi)* \
+                        (np.sin(np.pi/(4*alpha)))) + ((1-2/np.pi)*(np.cos(np.pi/(4*alpha)))))
+            elif alpha != 0 and t == -Ts/(4*alpha):
+                h[x] = (alpha/np.sqrt(2))*(((1+2/np.pi)* \
+                        (np.sin(np.pi/(4*alpha)))) + ((1-2/np.pi)*(np.cos(np.pi/(4*alpha)))))
+            else:
+                h[x] = (np.sin(np.pi*t*(1-alpha)/Ts) +  \
+                        4*alpha*(t/Ts)*np.cos(np.pi*t*(1+alpha)/Ts))/ \
+                        (np.pi*t*(1-(4*alpha*t/Ts)*(4*alpha*t/Ts))/Ts)
+    elif shape == 'normal':
+        for x in sample_num:
+            t = (x-N/2)*T_delta
+            if t == 0.0:
+                h[x] = 1.0
+            elif alpha != 0 and t == Ts/(2*alpha):
+                h[x] = (np.pi/4)*(np.sin(np.pi*t/Ts)/(np.pi*t/Ts))
+            elif alpha != 0 and t == -Ts/(2*alpha):
+                h[x] = (np.pi/4)*(np.sin(np.pi*t/Ts)/(np.pi*t/Ts))
+            else:
+                h[x] = (np.sin(np.pi*t/Ts)/(np.pi*t/Ts))* \
+                        (np.cos(np.pi*alpha*t/Ts)/(1-(((2*alpha*t)/Ts)*((2*alpha*t)/Ts))))    
+
+    h = np.append(h, h[0])
+    h = h / np.sqrt(h @ h) # normalize to unit energy
+
+    return h, time_idx    
 
 
 if __name__ == "__main__":
