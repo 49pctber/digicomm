@@ -317,7 +317,7 @@ def createDerivativeFilter(N=51,Tsamp=1):
     return d
 
 
-def derivativeFilter(x, N=51,Tsamp=1,zero_edge=False):
+def derivativeFilter2(x, N=51,Tsamp=1,zero_edge=False):
     '''
     Calculates the derivative of a discrete-time signal x with sample time Tsamp using a filter of length N.
     Because convolution results in values that are not correct near the edges, I decided to zero out those values as they can be quite large. So don't be surpised by the zeros at the beginning and end of the array.
@@ -329,6 +329,26 @@ def derivativeFilter(x, N=51,Tsamp=1,zero_edge=False):
         xd[0:pad] = 0
         xd[-pad:-1] = 0
         xd[-1] = 0
+    return xd
+
+
+def derivativeFilter(x,N=51,Tsamp=1):
+    '''
+    Calculates the derivative of a discrete-time signal x with sample time Tsamp using a filter of length N.
+    Because convolution results in values that are not correct near the edges, this function appends a linear extrapolation on either end prior to convolution to avoid strange filter behavior.
+    This might not work well in the presence of even mild noise, but seems to work better than the original function I wrote.
+    '''
+    d = createDerivativeFilter(N=N,Tsamp=Tsamp)
+    pad = int((N-1)/2) # this is the number of samples at the beginning/end of the signal that aren't quite correct due to blurring from convolution
+    
+    # extend x with linear extrapolation on both ends
+    x2 = np.zeros((len(x)+2*pad,))
+    x2[pad:-pad] = x # insert sequence in middle
+    x2[0:pad] = x[0] - np.arange(pad,0,step=-1) * (x[1] - x[0]) # left side extrapolation
+    x2[len(x2)-pad:len(x2)] = x[-1] + np.arange(1,pad+1) * (x[-1] - x[-2]) # right side extrapolation
+    
+    # valid values
+    xd = (np.convolve(x2,d))[2*pad:-2*pad]
     return xd
 
 

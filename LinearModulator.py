@@ -23,7 +23,50 @@ class LinearModulator:
             self.T = 1
             self.p, self.t = digicomm.rcosdesign(self.alpha, self.span, self.N, Ts=self.T, shape='sqrt')
 
+        self.Tsamp = self.T/self.N # sample time
+
+    def modulate(self, bits, **kwargs):
+        """
+        Produces a signal based on the specified array of 0,1 ints.
+        """
+        syms = digicomm.bitsToSymbols(bits, self.M) # indexes of symbols to transmit
+        z = digicomm.symbolsToIq(syms, self.constellation) # IQ values
+        tx = digicomm.upsample(z,self.p,self.N) # signal to transmit
+
+        if 'nuT' in kwargs.keys():
+            tx = digicomm.addFrequencyOffset(tx, nuT=kwargs['nuT'])
+
+        if 'phase' in kwargs.keys():
+            tx = digicomm.addPhaseOffset(tx, phase=kwargs['phase'])
+
+        if 'SNR' in kwargs.keys():
+            tx = digicomm.addNoise(tx,SNR=kwargs['SNR'],Eb=1/np.log2(self.M))
+
+        return tx
+
+    def demodulate(self, rx, **kwargs):
+
+        if 'nuT' in kwargs.keys():
+            rx = digicomm.addFrequencyOffset(rx, nuT=kwargs['nuT'])
+
+        if 'phase' in kwargs.keys():
+            rx = digicomm.addPhaseOffset(rx, phase=kwargs['phase'])
+
+        # demodulation
+        mf = digicomm.matchedFilter(rx,self.p)
+        sampinsts = np.arange(0,len(mf),self.N)
+        mfo = mf[sampinsts]
+        mfo = mfo[self.span:len(mfo)-self.span]
+        decisions = digicomm.makeDecisions(mfo,self.constellation)
+
+        # calculate BER
+        bits = digicomm.symbolsToBits(decisions,self.M)
+        return bits        
+
     def simulateBER(self, SNR, L=10000):
+        """
+        Simulates L symbols in an AWGN channel of the SNR specified in dB and returns the BER.
+        """
         # constellation parameters
         self.n_bits = L * int(np.log2(self.M))
 
@@ -37,7 +80,6 @@ class LinearModulator:
 
         # channel model
         rx = digicomm.addNoise(tx,SNR=SNR,Eb=1/np.log2(self.M))
-        # rx = digicomm.addNoise(tx,SNR=SNR,Eb=1)
 
         # demodulation
         mf = digicomm.matchedFilter(rx,self.p)
