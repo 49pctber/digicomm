@@ -1,12 +1,15 @@
 import numpy as np
 import scipy as sp
+import scipy.stats
+from scipy.signal.windows import *
 from matplotlib import pyplot as plt
 
 r_g = 2.75 # radius gamma used for 16-APSK
 
 
 constellations = {
-    'bpsk' : np.array([-1,1], 'complex128'),
+    'bpsk' : np.array([-1, 1], 'complex128'),
+    'bpam' : np.array([-1, 1], 'complex128'),
     '4pam' : np.array([-3, -1, 3, 1], 'complex128'),
     '8pam' : np.array([-7, -5, -1, -3, 7, 5, 1, 3], 'complex128'),
     'yqam' : np.array([0, np.exp(1j*np.pi/6), np.exp(1j*np.pi*3/2), np.exp(1j*5*np.pi/6)]),
@@ -23,6 +26,24 @@ constellations = {
             np.exp(1j*4*np.pi/4)
         ]),
     '16qam' : np.array([-3+3j,-3+1j,-3-3j,-3-1j,-1+3j,-1+1j,-1-3j,-1-1j,3+3j,3+1j,3-3j,3-1j,1+3j,1+1j,1-3j,1-1j]),
+    '16psk' : np.array([
+            np.exp(1j*0*np.pi/8),
+            np.exp(1j*1*np.pi/8),
+            np.exp(1j*3*np.pi/8),
+            np.exp(1j*2*np.pi/8),
+            np.exp(1j*6*np.pi/8),
+            np.exp(1j*7*np.pi/8),
+            np.exp(1j*15*np.pi/8),
+            np.exp(1j*14*np.pi/8),
+            np.exp(1j*10*np.pi/8),
+            np.exp(1j*11*np.pi/8),
+            np.exp(1j*9*np.pi/8),
+            np.exp(1j*8*np.pi/8),
+            np.exp(1j*12*np.pi/8),
+            np.exp(1j*13*np.pi/8),
+            np.exp(1j*5*np.pi/8),
+            np.exp(1j*4*np.pi/8)
+        ]),
     '16apsk' : np.array([
         r_g*np.exp(1j*3*np.pi/12),
         r_g*np.exp(1j*-3*np.pi/12),
@@ -44,7 +65,7 @@ constellations = {
 } # not necessarily unit energy!
 
 
-def getConstellation(type='bpsk', gamma=2.5):
+def getConstellation(type='bpsk'):
     '''
     Returns a constellation with average unit energy.
     '''
@@ -54,6 +75,13 @@ def getConstellation(type='bpsk', gamma=2.5):
     # Normalize energy and return constellation
     Eavg = np.mean(c * np.conj(c))
     return c / np.sqrt(Eavg)
+
+
+def generateRandomBits(n_bits):
+    '''
+    Generates a numpy array of 0's and 1's.
+    '''
+    return np.random.randint(0,high=2,size=n_bits,dtype='int')
 
 
 def bitsToSymbols(bits, M):
@@ -73,6 +101,20 @@ def bitsToSymbols(bits, M):
     return symbols
 
 
+def symbolsToIq(syms, constellation):
+    """
+    Converts symbol indexes to complex values according to the given constellation
+    """
+    return constellation[syms]
+
+
+def matchedFilter(x, p):
+    """
+    Given a signal x, performs matched filtering based on pulse shape p
+    """
+    return np.convolve(x,np.flip(np.conj(p)))
+
+
 def symbolsToBits(syms, M):
     '''
     Takes a series of symbols and converts them to their corresponding bits.
@@ -88,13 +130,30 @@ def symbolsToBits(syms, M):
     return bits
 
 
-def addNoise(iqs, SNR=10, Eb=1):
+def calculateBer(b1,b2):
+    """
+    Calculates the number of nonzero elements in the difference of the two arrays, and computes the bit error rate
+    """
+    return np.count_nonzero(b1 - b2) / len(b1)
+
+
+def addNoise(iqs, **kwargs):
     '''
-    adds noise for a specified SNR
-    must specify Eb, the energy per bit
+    adds additive white gaussian noise to an array of complex IQ samples
+    in **kwargs, you must specify
+        a. SNR (dB) and Eb (the energy per bit), or
+        b. N0, the noise variance
     '''
-    gamma = 10 ** (SNR/10) # gamma is SNR on linear scale
-    N0 = Eb / gamma
+    if 'SNR' and 'Eb' in kwargs.keys():
+        SNR = kwargs['SNR']
+        Eb = kwargs['Eb']
+        gamma = 10 ** (SNR/10) # gamma is SNR on linear scale
+        N0 = Eb / gamma
+    elif 'N0' in kwargs.keys():
+        N0 = kwargs['N0']
+    else:
+        raise Exception("addNoise(): must specify N0 or SNR & Eb in kwargs.")
+
     var = N0 / 2
     nr = np.random.normal(scale=np.sqrt(var), size=(len(iqs),))
     ni = np.random.normal(scale=np.sqrt(var), size=(len(iqs),))
@@ -251,8 +310,10 @@ def createDerivativeFilter(N=51,Tsamp=1):
     ndmin = -(N-1)/2
     ndmax = (N-1)/2 
     nd = np.arange(ndmin, ndmax+1)
-    d = 1 / Tsamp * ((-1)**nd) / nd / 2
-    d[np.isinf(d)] = 0
+    d = np.zeros(nd.shape)
+    ndnz = nd != 0 # nonzero indexes
+    d[ndnz] = 1 / Tsamp * ((-1)**nd[ndnz]) / nd[ndnz]
+    d = d * blackman(N)
     return d
 
 
@@ -337,6 +398,66 @@ def rcosdesign(alpha, span, Fs, Ts=1, shape='sqrt'):
     h = h / np.sqrt(h @ h) # normalize to unit energy
 
     return h, time_idx    
+
+
+def qfunc(x):
+    return scipy.stats.norm.sf(x)
+
+
+def lrecPulse(L,T,fsamp):
+    """
+    Rectangular Pulse shape for CPM (Table 3.3-1 of Proakis)
+    L is span of pulse shape (number of symbols)
+    T is the symbol time
+    fsamp is the sampling frequency
+    """
+    leng = int(L*T*fsamp)
+    t = np.linspace(0,L*T,num=leng)
+    g = 1/(2*L*T) * np.ones((leng,))
+    return g,t
+
+
+def lrcPulse(L,T,fsamp):
+    """
+    Raised cosine pulse shape for CPM (Table 3.3-1 of Proakis)
+    L is span of pulse shape (number of symbols)
+    T is the symbol time
+    fsamp is the sampling frequency
+    """
+    leng = int(L*T*fsamp)
+    t = np.linspace(0,L*T,num=leng)
+    g = 1/(2*L*T)*(1-np.cos(2*np.pi*t/(L*T))) * np.ones((leng,))
+    return g,t
+
+
+def gmskPulse(L, B, T, fsamp):
+    """
+    GMSK Pulse Shape for CPM (Table 3.3-1 of Proakis)
+    L is span of pulse shape (number of symbols)
+    B is bandwidth parameter
+    T is symbol time
+    fsamp is sampling frequency
+    """
+    t = np.arange(-L*T/2,L*T/2,step=1/fsamp) # sample instants
+    g = (qfunc(2*np.pi*B*(t-T/2)) - qfunc(2*np.pi*B*(t+T/2))) / 2 / T # pulse shape
+    return g,t
+
+
+def zeroInsert(x,L):
+    """
+    Zero insertion with L-1 zeros between each sample.
+    """
+    z = np.zeros((len(x),L),dtype='complex')
+    z[:,0] = x
+    return z.flatten()
+
+
+def upsample(x,p,L):
+    """
+    Upsample signal x by L, and convolve with p
+    """
+    train = zeroInsert(x,L)
+    return np.convolve(train,p)
 
 
 if __name__ == "__main__":
