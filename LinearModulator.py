@@ -31,7 +31,13 @@ class LinearModulator:
         """
         syms = digicomm.bitsToSymbols(bits, self.M) # indexes of symbols to transmit
         z = digicomm.symbolsToIq(syms, self.constellation) # IQ values
-        tx = digicomm.upsample(z,self.p,self.N) # signal to transmit
+        
+        if 'tau' in kwargs.keys():
+            p = digicomm.fractionalDelayFilter(self.p, kwargs['tau']/self.T, N=31)
+        else:
+            p = self.p
+        
+        tx = digicomm.upsample(z,p,self.N) # signal to transmit
 
         if 'nuT' in kwargs.keys():
             tx = digicomm.addFrequencyOffset(tx, nuT=kwargs['nuT'])

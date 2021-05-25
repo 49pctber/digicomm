@@ -352,6 +352,33 @@ def derivativeFilter(x,N=51,Tsamp=1):
     return xd
 
 
+def fractionalDelayCoeffs(T, dT, L):
+    """
+    Produces fractional delay filter coefficients.
+    """
+    n = np.arange(-L,L+1)
+    x = (n+dT/T)*np.pi
+    return np.sin(x) / x
+
+
+def fractionalDelayFilter(x,gamma,N=51):
+    """
+    Given a sampled signal x, delay by gamma samples, where gamma can be any float.
+    N is the length of the filter used.
+    """
+    d = fractionalDelayCoeffs(1,gamma,N//2)
+    pad = int((N-1)/2) # this is the number of samples at the beginning/end of the signal that aren't quite correct due to blurring from convolution
+    
+    # extend x with linear extrapolation on both ends
+    x2 = np.zeros((len(x)+2*pad,))
+    x2[pad:-pad] = x # insert sequence in middle
+    x2[0:pad] = x[0] - np.arange(pad,0,step=-1) * (x[1] - x[0]) # left side extrapolation
+    x2[len(x2)-pad:len(x2)] = x[-1] + np.arange(1,pad+1) * (x[-1] - x[-2]) # right side extrapolation
+    
+    # valid values
+    xd = (np.convolve(x2,d))[2*pad:-2*pad]
+    return xd
+
 def rcosdesign(alpha, span, Fs, Ts=1, shape='sqrt'):
     """
     Heavily modified from https://github.com/veeresht/CommPy/blob/master/commpy/filters.py
