@@ -3,11 +3,19 @@ import numpy as np
 
 class LinearModulator:
     def __init__(self, ctype='qpsk', **kwargs):
+        """
+        kwargs
+        ctype: constellation type (default is 'qpsk')
+        pulse: pulse shape
+        T: sample time 
+        N: samples per symbol
+        span: span of pulse shape
+        """
         self.constellation = digicomm.getConstellation(type=ctype)
         self.M = len(self.constellation)
         
         if 'shape' in kwargs.keys():
-            if kwargs['shape'] == 'srrc':
+            if kwargs['shape'] == 'sqrt':
                 self.alpha = kwargs['alpha']
                 self.span = kwargs['span']
                 self.N = kwargs['N']
@@ -15,6 +23,12 @@ class LinearModulator:
                 self.p, self.t = digicomm.rcosdesign(self.alpha, self.span, self.N, Ts=self.T, shape='sqrt')
             else:
                 raise Exception("Pulse shape not supported.")
+        elif 'pulse' in kwargs.keys():
+            self.p = kwargs['pulse']
+            self.T = kwargs['T']
+            self.N = kwargs['N']
+            self.span = kwargs['span']
+            self.t = np.arange(-len(self.p)//2,len(self.p)//2) * self.T
         else:
             print("Using default pulse shape.")
             self.alpha = 0.5

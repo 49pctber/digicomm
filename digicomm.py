@@ -3,6 +3,8 @@ import scipy as sp
 import scipy.stats
 from scipy.signal.windows import *
 from matplotlib import pyplot as plt
+import datetime
+
 
 r_g = 2.75 # radius gamma used for 16-APSK
 
@@ -358,7 +360,11 @@ def fractionalDelayCoeffs(T, dT, L):
     """
     n = np.arange(-L,L+1)
     x = (n+dT/T)*np.pi
-    return np.sin(x) / x
+    r = np.ones(x.shape)
+    idxs = x != 0
+    r[idxs] = np.sin(x[idxs]) / x[idxs]
+    return r
+    # return np.sin(x) / x
 
 
 def fractionalDelayFilter(x,gamma,N=51):
@@ -379,7 +385,7 @@ def fractionalDelayFilter(x,gamma,N=51):
     xd = (np.convolve(x2,d))[2*pad:-2*pad]
     return xd
 
-def rcosdesign(alpha, span, Fs, Ts=1, shape='sqrt'):
+def rcosdesign(alpha, span, sps, Ts=1, shape='sqrt'):
     """
     Heavily modified from https://github.com/veeresht/CommPy/blob/master/commpy/filters.py
     Modified:
@@ -394,8 +400,8 @@ def rcosdesign(alpha, span, Fs, Ts=1, shape='sqrt'):
         Roll off factor (Valid values are [0, 1]).
     span : int
         Number of symbols to span
-    Fs : float
-        Sampling Rate in Hz.
+    sps : int
+        Samples per symbol
     Ts : float
         Symbol period in seconds.
     Returns
@@ -407,8 +413,8 @@ def rcosdesign(alpha, span, Fs, Ts=1, shape='sqrt'):
         the impulse response.
     """
 
-    N = span * Fs
-    T_delta = 1/float(Fs)
+    N = span * sps
+    T_delta = Ts/float(sps)
     time_idx = ((np.arange(N+1)-N/2))*T_delta
     sample_num = np.arange(N)
     h = np.zeros(N, dtype=float)
@@ -493,10 +499,11 @@ def gmskPulse(L, B, T, fsamp):
 def zeroInsert(x,L):
     """
     Zero insertion with L-1 zeros between each sample.
+    Update: no trailing zeros at the end.
     """
     z = np.zeros((len(x),L),dtype='complex')
     z[:,0] = x
-    return z.flatten()
+    return z.flatten()[0:-(L-1)]
 
 
 def upsample(x,p,L):
@@ -505,6 +512,28 @@ def upsample(x,p,L):
     """
     train = zeroInsert(x,L)
     return np.convolve(train,p)
+
+
+def wrap(t, A):
+    """
+    This returns the smallest difference between t and a multiple of 2*A.
+    This may return a negative value.
+    The graph looks like
+        /    /    /   
+       /    /    /
+    --/----/----/--
+     /    /    /
+    /    /    /
+    with extrema -A and A.
+    """
+    return np.mod(t+A, 2*A) - A
+    
+
+def timestampStr():
+    """
+    A simple timestamp function that returns the current date and time as a string.
+    """
+    return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
 if __name__ == "__main__":
