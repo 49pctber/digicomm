@@ -1,70 +1,8 @@
 import numpy as np
-import scipy as sp
 import scipy.stats
 from scipy.signal.windows import *
-from matplotlib import pyplot as plt
 import datetime
-
-
-r_g = 2.75 # radius gamma used for 16-APSK
-
-
-constellations = {
-    'bpsk' : np.array([-1, 1], 'complex128'),
-    'bpam' : np.array([-1, 1], 'complex128'),
-    '4pam' : np.array([-3, -1, 3, 1], 'complex128'),
-    '8pam' : np.array([-7, -5, -1, -3, 7, 5, 1, 3], 'complex128'),
-    'yqam' : np.array([0, np.exp(1j*np.pi/6), np.exp(1j*np.pi*3/2), np.exp(1j*5*np.pi/6)]),
-    '8qam' : np.array([-3+1j,-3-1j,-1+1j,-1-1j,3+1j,3-1j,1+1j,1-1j]),
-    'qpsk' : np.array([1+1j,1-1j,-1+1j,-1-1j]),
-    '8psk' : np.array([
-            np.exp(1j*0*np.pi/4),
-            np.exp(1j*1*np.pi/4),
-            np.exp(1j*3*np.pi/4),
-            np.exp(1j*2*np.pi/4),
-            np.exp(1j*6*np.pi/4),
-            np.exp(1j*7*np.pi/4),
-            np.exp(1j*5*np.pi/4),
-            np.exp(1j*4*np.pi/4)
-        ]),
-    '16qam' : np.array([-3+3j,-3+1j,-3-3j,-3-1j,-1+3j,-1+1j,-1-3j,-1-1j,3+3j,3+1j,3-3j,3-1j,1+3j,1+1j,1-3j,1-1j]),
-    '16psk' : np.array([
-            np.exp(1j*0*np.pi/8),
-            np.exp(1j*1*np.pi/8),
-            np.exp(1j*3*np.pi/8),
-            np.exp(1j*2*np.pi/8),
-            np.exp(1j*6*np.pi/8),
-            np.exp(1j*7*np.pi/8),
-            np.exp(1j*15*np.pi/8),
-            np.exp(1j*14*np.pi/8),
-            np.exp(1j*10*np.pi/8),
-            np.exp(1j*11*np.pi/8),
-            np.exp(1j*9*np.pi/8),
-            np.exp(1j*8*np.pi/8),
-            np.exp(1j*12*np.pi/8),
-            np.exp(1j*13*np.pi/8),
-            np.exp(1j*5*np.pi/8),
-            np.exp(1j*4*np.pi/8)
-        ]),
-    '16apsk' : np.array([
-        r_g*np.exp(1j*3*np.pi/12),
-        r_g*np.exp(1j*-3*np.pi/12),
-        r_g*np.exp(1j*9*np.pi/12),
-        r_g*np.exp(1j*-9*np.pi/12),
-        r_g*np.exp(1j*1*np.pi/12),
-        r_g*np.exp(1j*-1*np.pi/12),
-        r_g*np.exp(1j*11*np.pi/12),
-        r_g*np.exp(1j*-11*np.pi/12),
-        r_g*np.exp(1j*5*np.pi/12),
-        r_g*np.exp(1j*-5*np.pi/12),
-        r_g*np.exp(1j*7*np.pi/12),
-        r_g*np.exp(1j*-7*np.pi/12),
-        np.exp(1j*3*np.pi/12),
-        np.exp(1j*-3*np.pi/12),
-        np.exp(1j*9*np.pi/12),
-        np.exp(1j*-9*np.pi/12),
-    ]),
-} # not necessarily unit energy!
+from constellations import constellations
 
 
 def getConstellation(type='bpsk'):
@@ -139,6 +77,14 @@ def calculateBer(b1,b2):
     return np.count_nonzero(b1 - b2) / len(b1)
 
 
+def noiseVariance(SNR, Eb):
+    """
+    Given an SNR in dB and an energy per bit Eb, calculate the noise variance N0.
+    Note: This calculates Eb / gamma, where gamma is the SNR on a linear scale.
+    """
+    return Eb / (10 ** (SNR/10)) # calculates N0
+
+
 def addNoise(iqs, **kwargs):
     '''
     adds additive white gaussian noise to an array of complex IQ samples
@@ -149,8 +95,7 @@ def addNoise(iqs, **kwargs):
     if 'SNR' and 'Eb' in kwargs.keys():
         SNR = kwargs['SNR']
         Eb = kwargs['Eb']
-        gamma = 10 ** (SNR/10) # gamma is SNR on linear scale
-        N0 = Eb / gamma
+        N0 = noiseVariance(SNR, Eb)
     elif 'N0' in kwargs.keys():
         N0 = kwargs['N0']
     else:
@@ -385,6 +330,7 @@ def fractionalDelayFilter(x,gamma,N=51):
     xd = (np.convolve(x2,d))[2*pad:-2*pad]
     return xd
 
+
 def rcosdesign(alpha, span, sps, Ts=1, shape='sqrt'):
     """
     Heavily modified from https://github.com/veeresht/CommPy/blob/master/commpy/filters.py
@@ -454,6 +400,9 @@ def rcosdesign(alpha, span, sps, Ts=1, shape='sqrt'):
 
 
 def qfunc(x):
+    """
+    Returns the area under the right tail [x,infinity) of the standard normal distribution.
+    """
     return scipy.stats.norm.sf(x)
 
 
@@ -536,8 +485,78 @@ def timestampStr():
     return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
+def intToBinary(n, nbits):
+    """
+    n is an integer
+    nbits is number of bits to use in the binary representation
+    returns an numpy array of bits
+
+    e.g.
+    intToBinary(3,20) -> [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1]
+    intToBinary(1, 4) -> [0 0 0 1]
+    intToBinary(-1, 4) -> [1 1 1 1] # notice this is the same as below
+    intToBinary(15, 4) -> [1 1 1 1] # notice this is the same as above
+    """
+    s = np.binary_repr(n,width=nbits)
+    t = ("".join([c + "," for c in s]))[0:-1]
+    return np.fromstring(t,dtype=int,sep=',')
+
+
+def zeroCenteredArray(n):
+    """ Produces an array of length n with increasing integers with a zero at the center """
+    return np.arange(-(n-1)//2,(n-1)//2+1)
+    
+
+def arrayCenter(x,y):
+    """
+    Takes two numpy arrays.
+    This function will return two values
+    1. The first value returns the longer of the two arrays
+    2. The second returns the shorter as an array padded with zeros on both ends so that it is the same length as the longer array.
+
+    e.g.
+    arrayCenter(
+        np.array([1, 2, 3]),
+        np.array([2, 3, 4, 5, 6]))
+    -> (array([2, 3, 4, 5, 6]), array([0, 1, 2, 3, 0]))
+    """
+    n = len(x)
+    m = len(y)
+
+    if n < m:
+        x, y = y, x
+        n = len(x)
+        m = len(y)
+
+    z = np.zeros((n,))
+    zi = (n-m)//2
+    z[zi:zi+m] = y
+
+    return x, z
+
+
+def frequencyAxis(n, fs=1):
+    """
+    Returns the sample frequencies of a length-n FFT for a sequence with sample frequency fs.
+    The DC component will be in the center of the array, not the beginning.
+    """
+    return zeroCenteredArray(n) / n * fs
+
+
+def valleyFill(x):
+    x = np.copy(x)
+    for i in range(len(x)-2,-1,-1):
+        if x[i] < x[i+1]:
+            x[i] = x[i+1]
+    return x
+    
+
+def randomInRange(low=0, high=1):
+    """
+    Return a random value between [low, high) in the interval
+    """
+    return np.random.random() * (high - low) + low
+
+
 if __name__ == "__main__":
-    syms = np.array([0,1,2,3,15])
-
-    print(symbolsToBits(syms, 16))
-
+    print(constellations['bpsk'])
