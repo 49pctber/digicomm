@@ -1,4 +1,8 @@
-# test\rcosdesign
+# `tests\other`
+
+These tests were used during development, but they aren't used by pytest. Maybe I'll get around to converting them some day.
+
+## test_rcosdesign
 
 I created pulse_normal and pulse_sqrt using the following MATLAB code:
 

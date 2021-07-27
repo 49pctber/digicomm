@@ -2,19 +2,6 @@ import numpy as np
 import scipy.stats
 from scipy.signal.windows import *
 import datetime
-from constellations import constellations
-
-
-def getConstellation(type='bpsk'):
-    '''
-    Returns a constellation with average unit energy.
-    '''
-    # Form constellation
-    c = constellations[type]
-
-    # Normalize energy and return constellation
-    Eavg = np.mean(c * np.conj(c))
-    return c / np.sqrt(Eavg)
 
 
 def generateRandomBits(n_bits):
@@ -543,12 +530,15 @@ def frequencyAxis(n, fs=1):
     return zeroCenteredArray(n) / n * fs
 
 
-def valleyFill(x):
-    x = np.copy(x)
-    for i in range(len(x)-2,-1,-1):
-        if x[i] < x[i+1]:
-            x[i] = x[i+1]
-    return x
+def valleyFill(x, flip=False):
+    if flip:
+        return np.flip(valleyFill(np.flip(x)))
+    else:
+        x = np.copy(x)
+        for i in range(len(x)-2,-1,-1):
+            if x[i] < x[i+1]:
+                x[i] = x[i+1]
+        return x
     
 
 def randomInRange(low=0, high=1):
@@ -556,7 +546,3 @@ def randomInRange(low=0, high=1):
     Return a random value between [low, high) in the interval
     """
     return np.random.random() * (high - low) + low
-
-
-if __name__ == "__main__":
-    print(constellations['bpsk'])

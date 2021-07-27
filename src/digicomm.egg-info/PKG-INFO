@@ -1,0 +1,34 @@
+Metadata-Version: 2.1
+Name: digicomm
+Version: 0.0.3
+Summary: Tools for digital communications simulations
+Home-page: https://github.com/ae6nr/digicomm
+Author: Bryan Redd
+Author-email: bryan.d.redd@gmail.com
+License: UNKNOWN
+Project-URL: About Me, https://ae6nr.github.io/
+Project-URL: Bug Tracker, https://github.com/ae6nr/digicomm/issues
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+# digicomm
+
+Tools for digital communications simulations.
+
+## Organization
+
+``digicomm.py`` is the main workhorse that contains the relevant functions. This script can be imported to have access to
+- functions that can add noise, phase offsets, frequency offsets to complex values representing symbols
+- symbol decision functions
+- perform frequency offset estimation
+- derivative filters
+- a MATLAB-style rcosdesign
+- ...and more to come.
+
+Folders contain example applications of the ``digicomm.py`` script, like bit error rate simulations, derivative filters, symbol synchronization, etc. The ``test\`` contains code that I used to develop functionality for a given function.
+

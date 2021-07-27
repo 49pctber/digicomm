@@ -1,5 +1,7 @@
 import digicomm
 import numpy as np
+from digicomm.constellations import getConstellation
+
 
 class LinearModulator:
     def __init__(self, ctype='qpsk', **kwargs):
@@ -11,7 +13,7 @@ class LinearModulator:
         N: samples per symbol
         span: span of pulse shape
         """
-        self.constellation = digicomm.getConstellation(type=ctype)
+        self.constellation = getConstellation(type=ctype)
         self.M = len(self.constellation)
         
         if 'shape' in kwargs.keys():

@@ -66,3 +66,15 @@ constellations = {
         np.exp(1j*-9*np.pi/12),
     ]),
 } # not necessarily unit energy!
+
+
+def getConstellation(type='bpsk'):
+    '''
+    Returns a constellation with average unit energy.
+    '''
+    # Form constellation
+    c = constellations[type]
+
+    # Normalize energy and return constellation
+    Eavg = np.mean(c * np.conj(c))
+    return c / np.sqrt(Eavg)

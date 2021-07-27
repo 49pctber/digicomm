@@ -1,15 +1,21 @@
 # digicomm
 
+Author: redd
+
 Tools for digital communications simulations.
+
+Install using `pip install digicomm`
 
 ## Organization
 
-``digicomm.py`` is the main workhorse that contains the relevant functions. This script can be imported to have access to
-- functions that can add noise, phase offsets, frequency offsets to complex values representing symbols
-- symbol decision functions
-- perform frequency offset estimation
-- derivative filters
-- a MATLAB-style rcosdesign
-- ...and more to come.
+### `digicomm`
+Most of the useful functions can be accessed using `import digicomm`. These include functions that can add noise for a given SNR, symbol decision functions, filters, etc.
 
-Folders contain example applications of the ``digicomm.py`` script, like bit error rate simulations, derivative filters, symbol synchronization, etc. The ``test\`` contains code that I used to develop functionality for a given function.
+### `digicomm.constellations`
+`digicomm.constellations` contains common constellations used for linear modulations.
+
+### `digicomm.LinearModulator`
+`digicomm.LinearModulator` contains a class that can be used to simulate BER performance for various modulation schemes.
+
+### `digicomm.Pll`
+`digicomm.Pll` contains a PLL for timing and phase error tracking.

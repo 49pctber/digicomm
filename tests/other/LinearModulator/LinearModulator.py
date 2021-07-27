@@ -1,4 +1,4 @@
-from LinearModulator import *
+from digicomm.LinearModulator import *
 import matplotlib.pyplot as plt
 import numpy as np
 
